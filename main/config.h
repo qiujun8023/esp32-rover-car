@@ -40,12 +40,13 @@
 #define DISPLAY_WIDTH  240
 #define DISPLAY_HEIGHT 240
 
-// i2s 音频引脚 (预留)
-#define I2S_SPK_BCLK GPIO_NUM_47
-#define I2S_SPK_LRCK GPIO_NUM_21
+// i2s 音频引脚 (预留，全双工模式)
+// 全双工 i2s 中 BCLK 和 WS 由扬声器与麦克风共享，仅数据线独立
+#define I2S_SPK_BCLK GPIO_NUM_47  // 与 I2S_MIC_SCK 共用
+#define I2S_SPK_LRCK GPIO_NUM_21  // 与 I2S_MIC_WS 共用
 #define I2S_SPK_DOUT GPIO_NUM_35
-#define I2S_MIC_SCK  GPIO_NUM_47
-#define I2S_MIC_WS   GPIO_NUM_21
+#define I2S_MIC_SCK  GPIO_NUM_47  // 与 I2S_SPK_BCLK 共用
+#define I2S_MIC_WS   GPIO_NUM_21  // 与 I2S_SPK_LRCK 共用
 #define I2S_MIC_DIN  GPIO_NUM_2
 
 // wifi 配置

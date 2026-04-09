@@ -3,6 +3,8 @@
 #include <driver/gpio.h>
 #include <driver/ledc.h>
 #include <esp_log.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 #include "config.h"
 
@@ -12,8 +14,9 @@
 
 static const char* TAG = "motor";
 
-// 记录当前左右轮速度状态
-static volatile int s_left = 0, s_right = 0;
+// 记录当前左右轮速度状态（由互斥锁保护多任务访问）
+static int              s_left = 0, s_right = 0;
+static SemaphoreHandle_t s_speed_mutex = NULL;
 
 typedef struct {
     gpio_num_t     in1;
@@ -63,6 +66,9 @@ void motor_init(void) {
     gpio_config(&stby_cfg);
     gpio_set_level(MOTOR_STBY_L, 1);
     gpio_set_level(MOTOR_STBY_R, 1);
+
+    s_speed_mutex = xSemaphoreCreateMutex();
+    configASSERT(s_speed_mutex);
 
     // 配置 pwm 定时器
     ledc_timer_config_t timer_cfg = {
@@ -130,8 +136,10 @@ void motor_set_wheel(wheel_t wheel, int speed) {
  * 由于左侧电机反向安装，在此处进行物理补偿。
  */
 void motor_drive(int left, int right) {
+    xSemaphoreTake(s_speed_mutex, portMAX_DELAY);
     s_left  = left;
     s_right = right;
+    xSemaphoreGive(s_speed_mutex);
 
     // 左侧轮子速度取反以实现前进方向一致
     motor_set_wheel(WHEEL_FL, -left);
@@ -147,6 +155,8 @@ void motor_stop(void) {
 }
 
 void motor_get_speed(int* left, int* right) {
+    xSemaphoreTake(s_speed_mutex, portMAX_DELAY);
     if (left) *left = s_left;
     if (right) *right = s_right;
+    xSemaphoreGive(s_speed_mutex);
 }

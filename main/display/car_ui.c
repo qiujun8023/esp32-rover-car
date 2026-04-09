@@ -39,7 +39,7 @@ static esp_lcd_panel_io_handle_t s_panel_io = NULL;
 static uint16_t s_line_buf[LINE_BUF_LINES][DISPLAY_WIDTH];
 
 /*
- * 5x7 像素字体（ASCII 32-127）
+ * 5x7 像素字体（ASCII 32-122，即 ' ' 到 'z'）
  *
  * 使用 static const 存储，避免占用 RAM。
  * 每个字符 5 列，每列 7 位（从上到下）。

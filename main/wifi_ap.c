@@ -21,7 +21,6 @@
 #define WS_BUF_SIZE       128    // WebSocket 接收缓冲区大小
 #define JOYSTICK_DEADZONE 0.14f  // 摇杆死区半径（归一化坐标）
 #define DNS_TASK_STACK    3072   // DNS 任务栈大小
-#define UI_TASK_STACK     4096   // UI 任务栈大小
 #define AP_CHANNEL        1      // WiFi AP 信道
 #define AP_MAX_CONN       4      // 最大连接数
 #define AP_IP_ADDR        "10.10.10.10"
@@ -116,10 +115,11 @@ static const char s_html[] =
  * jx < 0 左转, jx > 0 右转
  */
 static void parse_cmd(const char* data, size_t len) {
-    if (!strstr(data, "\"j\"")) return;
+    const char* j_pos = strstr(data, "\"j\"");
+    if (!j_pos) return;
 
     float       jx = 0, jy = 0;
-    const char* bracket = strstr(data, ":[");
+    const char* bracket = strstr(j_pos, ":[");
     if (!bracket || sscanf(bracket + 2, "%f,%f", &jx, &jy) != 2) {
         return;
     }
@@ -207,11 +207,17 @@ static void dns_task(void* arg) {
         if (n < 12) continue;
 
         // 构造 dns 响应 (解析到 10.10.10.10)
+        // 追加 16 字节 answer section，检查空间是否足够
+        if (n + 16 > (int)sizeof(buf)) {
+            ESP_LOGW(TAG, "dns query too large: %d, skipping", n);
+            continue;
+        }
+
         uint8_t resp[512];
         memset(resp, 0, sizeof(resp));
         memcpy(resp, buf, n);
         resp[2] = 0x81;
-        resp[3] = 0x80;  // flags: qr=1, aa=1, rcode=0
+        resp[3] = 0x80;  // flags: qr=1, rd=1, ra=1, rcode=0
         resp[7] = 0x01;  // ancount=1
 
         int pos     = n;
