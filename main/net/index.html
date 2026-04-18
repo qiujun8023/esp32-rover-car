@@ -25,7 +25,7 @@ var ws,joy=document.getElementById('joystick-area'),stick=document.getElementByI
 function connect(){
   ws=new WebSocket('ws://'+location.host+'/ws');
   ws.onopen=function(){document.getElementById('status').textContent='已连接';};
-  ws.onclose=function(){document.getElementById('status').textContent='已断开,重连中...';setTimeout(connect,2000);};
+  ws.onclose=function(){document.getElementById('status').textContent='已断开，重连中...';setTimeout(connect,2000);};
   ws.onerror=function(){ws.close();};
 }
 connect();

@@ -15,7 +15,7 @@
 
 static const char* TAG = "car_ui";
 
-// rgb565
+// RGB565
 #define COLOR_BLACK  0x0000
 #define COLOR_WHITE  0xFFFF
 #define COLOR_RED    0xF800
@@ -26,7 +26,7 @@ static const char* TAG = "car_ui";
 #define COLOR_GRAY   0x8410
 #define COLOR_BG     0x1082
 
-// 16 行分块刷新:权衡单次 spi dma 传输大小与 ram 占用(16*240*2=7.5kb)
+// 16 行分块刷新：权衡单次 SPI DMA 传输大小与 RAM 占用（16×240×2=7.5 KB）
 #define LINE_BUF_LINES 16
 #define FONT_SCALE     2
 #define CHAR_W         (5 * FONT_SCALE + FONT_SCALE)
@@ -37,7 +37,7 @@ static esp_lcd_panel_io_handle_t s_panel_io = NULL;
 
 static uint16_t s_line_buf[LINE_BUF_LINES][DISPLAY_WIDTH];
 
-// 5x7 像素字体,ascii ' ' 到 'z';每字符 5 列,每列 7 位(从上到下)
+// 5×7 像素字体，ASCII ' ' 到 'z'；每字符 5 列，每列 7 位（从上到下）
 static const uint8_t FONT5x7[][5] = {
     {0x00, 0x00, 0x00, 0x00, 0x00},  // ' '
     {0x00, 0x00, 0x5F, 0x00, 0x00},  // '!'
@@ -150,7 +150,7 @@ void car_ui_init(void) {
     };
     ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &bus, SPI_DMA_CH_AUTO));
 
-    // st7789 采用 spi mode 3,80mhz 是 esp32-s3 gpio matrix 下的稳定上限
+    // ST7789 采用 SPI Mode 3，80 MHz 是 ESP32-S3 GPIO Matrix 下的稳定上限
     esp_lcd_panel_io_spi_config_t io_cfg = {
         .cs_gpio_num       = DISPLAY_CS,
         .dc_gpio_num       = DISPLAY_DC,
@@ -170,7 +170,7 @@ void car_ui_init(void) {
     ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(s_panel_io, &panel_cfg, &s_panel));
     ESP_ERROR_CHECK(esp_lcd_panel_reset(s_panel));
     ESP_ERROR_CHECK(esp_lcd_panel_init(s_panel));
-    // 本批次 st7789 模组出厂默认反相显示,需 invert 才能得到正常颜色
+    // 本批次 ST7789 模组出厂默认反相显示，需 invert 才能得到正常颜色
     ESP_ERROR_CHECK(esp_lcd_panel_invert_color(s_panel, true));
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(s_panel, true));
 
@@ -193,7 +193,7 @@ static void fill_rect(int x, int y, int w, int h, uint16_t color) {
 
     for (int i = 0; i < LINE_BUF_LINES; i++) {
         for (int j = 0; j < w; j++) {
-            // rgb565 在 spi 上是大端,驱动不做字节序转换,这里手工 swap
+            // RGB565 在 SPI 上是大端，驱动不做字节序转换，这里手工 swap
             s_line_buf[i][j] = (color << 8) | (color >> 8);
         }
     }
@@ -204,7 +204,7 @@ static void fill_rect(int x, int y, int w, int h, uint16_t color) {
     }
 }
 
-// 先在本地 buf 渲染再一次 draw_bitmap,比逐像素 spi 快一个量级
+// 先在本地 buf 渲染再一次 draw_bitmap，比逐像素 SPI 快一个量级
 static void draw_char(int x, int y, char c, uint16_t fg, uint16_t bg) {
     if (c < ' ' || c > 'z')
         c = ' ';
@@ -247,7 +247,7 @@ static bool s_last_ble = false, s_last_wifi = false;
 static bool s_first = true;
 
 void car_ui_update(int left_speed, int right_speed, bool ble_connected, bool wifi_connected) {
-    // ui 任务以 20hz 刷新,无变化时跳过重绘,避免无意义占用 spi
+    // UI 任务以 20 Hz 刷新，无变化时跳过重绘，避免无意义占用 SPI
     if (!s_first && left_speed == s_last_left && right_speed == s_last_right && ble_connected == s_last_ble &&
         wifi_connected == s_last_wifi) {
         return;

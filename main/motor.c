@@ -9,7 +9,7 @@
 
 #include "config.h"
 
-// 10khz 可避开可闻噪声,8-bit 对应占空比 0-255
+// 10 kHz 可避开可闻噪声,8-bit 对应占空比 0-255
 #define MOTOR_PWM_FREQ 10000
 #define MOTOR_PWM_RES  8
 
@@ -50,7 +50,7 @@ static void set_pwm(ledc_channel_t ch, uint32_t duty) {
 }
 
 void motor_init(void) {
-    // stby 拉高使 tb6612 退出待机
+    // STBY 拉高使 TB6612 退出待机
     uint64_t      stby_mask = (1ULL << MOTOR_STBY_L) | (1ULL << MOTOR_STBY_R);
     gpio_config_t stby_cfg  = {
          .pin_bit_mask = stby_mask,

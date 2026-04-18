@@ -15,12 +15,12 @@
 #define UI_TASK_STACK       6144
 #define UI_TASK_PRIORITY    3
 #define UI_TASK_INTERVAL_MS 50
-// 超时则判定遥控失联,强制停车
+// 超时则判定遥控失联，强制停车
 #define CMD_TIMEOUT_MS 500
 
 static const char* TAG = "main";
 
-// 同一个任务复用做指令看门狗,避免额外 tick 任务
+// 同一个任务复用做指令看门狗，避免额外 tick 任务
 static void task_ui(void* arg) {
     int left, right;
     while (1) {

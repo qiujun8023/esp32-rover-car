@@ -12,7 +12,7 @@
 
 static const char* TAG = "wifi_ap";
 
-// rfc 8910 dhcp option 114:ios 14+/android 11+ 据此自动弹 captive portal
+// RFC 8910 DHCP Option 114：iOS 14+ / Android 11+ 据此自动弹 captive portal
 static char s_portal_uri[] = "http://192.168.4.1/";
 
 static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, void* data) {
@@ -22,7 +22,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
     } else if (id == WIFI_EVENT_AP_STADISCONNECTED) {
         wifi_event_ap_stadisconnected_t* e = (wifi_event_ap_stadisconnected_t*)data;
         ESP_LOGW(TAG, "station disconnected, mac=" MACSTR ", stopping motors", MAC2STR(e->mac));
-        // 客户端掉线后电机会持续按最后一条指令跑,必须立刻停下
+        // 客户端掉线后电机会持续按最后一条指令跑，必须立刻停下
         motor_stop();
     }
 }
@@ -30,7 +30,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 static void configure_dhcps_captive(esp_netif_t* ap_netif) {
     esp_netif_dhcps_stop(ap_netif);
 
-    // 自己就是 dns 服务器,captive_dns 才能截获域名查询
+    // 自己就是 DNS 服务器，captive_dns 才能截获域名查询
     esp_netif_dns_info_t dns = {.ip.type = ESP_IPADDR_TYPE_V4};
     IP4_ADDR(&dns.ip.u_addr.ip4, 192, 168, 4, 1);
     esp_netif_set_dns_info(ap_netif, ESP_NETIF_DNS_MAIN, &dns);

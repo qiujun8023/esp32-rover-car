@@ -95,9 +95,9 @@ static void parse_cmd(const char* data) {
 
     float fl   = -jy + jx;
     float fr   = -jy - jx;
-    float maxv = (float)fabs(fl);
-    if ((float)fabs(fr) > maxv)
-        maxv = (float)fabs(fr);
+    float maxv = fabsf(fl);
+    if (fabsf(fr) > maxv)
+        maxv = fabsf(fr);
     if (maxv > 1.0f) {
         fl /= maxv;
         fr /= maxv;
@@ -141,17 +141,17 @@ static esp_err_t handle_ws(httpd_req_t* req) {
 static esp_err_t reply_connectivity_success(httpd_req_t* req) {
     const char* uri = req->uri;
 
-    // android / chrome
+    // Android / Chrome
     if (strstr(uri, "generate_204") || strstr(uri, "gen_204")) {
         httpd_resp_set_status(req, "204 No Content");
         return httpd_resp_send(req, NULL, 0);
     }
-    // apple ios / macos
+    // Apple iOS / macOS
     if (strstr(uri, "hotspot-detect.html")) {
         httpd_resp_set_type(req, "text/html");
         return httpd_resp_sendstr(req, "<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>");
     }
-    // windows
+    // Windows
     if (strstr(uri, "connecttest.txt")) {
         httpd_resp_set_type(req, "text/plain");
         return httpd_resp_sendstr(req, "Microsoft Connect Test");
@@ -160,7 +160,7 @@ static esp_err_t reply_connectivity_success(httpd_req_t* req) {
         httpd_resp_set_type(req, "text/plain");
         return httpd_resp_sendstr(req, "Microsoft NCSI");
     }
-    // firefox
+    // Firefox
     if (strstr(uri, "canonical.html") || strstr(uri, "success.txt")) {
         httpd_resp_set_type(req, "text/plain");
         return httpd_resp_sendstr(req, "success\n");

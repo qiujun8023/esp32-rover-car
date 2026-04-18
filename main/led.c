@@ -5,7 +5,7 @@
 
 #include "config.h"
 
-// ws2812 位时序需要 10mhz rmt 分辨率才能满足 T0H/T1H 约束
+// WS2812 位时序需要 10 MHz RMT 分辨率才能满足 T0H/T1H 约束
 #define LED_RMT_FREQ_HZ (10 * 1000 * 1000)
 
 static const char*        TAG = "led";
@@ -46,7 +46,7 @@ void led_flush(void) {
 }
 
 void led_off(void) {
-    // clear 只清缓冲,需要 refresh 才真正熄灭硬件
+    // clear 只清缓冲，需要 refresh 才真正熄灭硬件
     led_strip_clear(s_strip);
     led_strip_refresh(s_strip);
 }
