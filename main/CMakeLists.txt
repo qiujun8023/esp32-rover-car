@@ -3,16 +3,22 @@ idf_component_register(
         "main.c"
         "motor.c"
         "led.c"
-        "wifi_ap.c"
+        "net/wifi_ap.c"
+        "net/captive_dns.c"
+        "net/http_server.c"
         "display/car_ui.c"
     INCLUDE_DIRS "."
-    REQUIRES
+    PRIV_REQUIRES
         driver
         esp_wifi
         esp_netif
         esp_event
-        nvs_flash
-        esp_lcd
         esp_http_server
+        esp_lcd
+        json
         led_strip
+        nvs_flash
+        lwip
+    EMBED_FILES
+        "net/index.html"
 )

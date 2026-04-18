@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>ESP32-Rover-Car</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0e1a;color:#00ffe1;font-family:Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:24px;padding:16px}
+h2{font-size:1.2rem;letter-spacing:3px;text-shadow:0 0 12px #00ffe1}
+#joystick-area{position:relative;width:200px;height:200px;border-radius:50%;border:2px solid rgba(0,255,225,0.4);background:rgba(0,255,225,0.05);touch-action:none}
+#stick{position:absolute;width:64px;height:64px;border-radius:50%;background:radial-gradient(circle,#00ffe1,#00b3a4);box-shadow:0 0 16px #00ffe1;top:68px;left:68px;pointer-events:none}
+#speed{font-size:.85rem;opacity:.7;letter-spacing:1px}
+#status{font-size:.75rem;opacity:.5;letter-spacing:1px}
+</style>
+</head>
+<body>
+<h2>ESP32-Rover-Car</h2>
+<div id="joystick-area"><div id="stick"></div></div>
+<div id="speed">L: 0 &nbsp; R: 0</div>
+<div id="status">连接中...</div>
+<script>
+var ws,joy=document.getElementById('joystick-area'),stick=document.getElementById('stick'),R=100,r=32,dragging=false,ox=0,oy=0;
+
+function connect(){
+  ws=new WebSocket('ws://'+location.host+'/ws');
+  ws.onopen=function(){document.getElementById('status').textContent='已连接';};
+  ws.onclose=function(){document.getElementById('status').textContent='已断开,重连中...';setTimeout(connect,2000);};
+  ws.onerror=function(){ws.close();};
+}
+connect();
+
+function send(obj){if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj));}
+
+function moveTo(x,y){
+  var d=Math.sqrt(x*x+y*y);
+  if(d>R-r){x=x/d*(R-r);y=y/d*(R-r);}
+  stick.style.left=(R-r+x)+'px';stick.style.top=(R-r+y)+'px';
+  var jx=x/(R-r),jy=y/(R-r);
+  var fl=-jy+jx,fr=-jy-jx;
+  var mv=Math.max(Math.abs(fl),Math.abs(fr));
+  if(mv>1){fl/=mv;fr/=mv;}
+  document.getElementById('speed').textContent='L: '+Math.round(fl*255)+' \u00a0 R: '+Math.round(fr*255);
+  send({j:[jx,jy]});
+}
+
+function resetStick(){
+  stick.style.left=(R-r)+'px';stick.style.top=(R-r)+'px';
+  document.getElementById('speed').textContent='L: 0 \u00a0 R: 0';
+  send({j:[0,0]});
+}
+
+joy.addEventListener('touchstart',function(e){
+  e.preventDefault();dragging=true;
+  var rect=joy.getBoundingClientRect();ox=rect.left+R;oy=rect.top+R;
+},{passive:false});
+joy.addEventListener('touchmove',function(e){
+  e.preventDefault();if(!dragging)return;
+  var t=e.touches[0];moveTo(t.clientX-ox,t.clientY-oy);
+},{passive:false});
+joy.addEventListener('touchend',function(e){
+  e.preventDefault();dragging=false;resetStick();
+},{passive:false});
+
+joy.addEventListener('mousedown',function(e){
+  dragging=true;var rect=joy.getBoundingClientRect();
+  ox=rect.left+R;oy=rect.top+R;moveTo(e.clientX-ox,e.clientY-oy);
+});
+window.addEventListener('mousemove',function(e){if(dragging)moveTo(e.clientX-ox,e.clientY-oy);});
+window.addEventListener('mouseup',function(){if(dragging){dragging=false;resetStick();}});
+</script>
+</body>
+</html>

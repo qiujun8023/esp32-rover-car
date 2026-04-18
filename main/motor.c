@@ -5,18 +5,22 @@
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#include <freertos/task.h>
 
 #include "config.h"
 
-// pwm 配置
-#define MOTOR_PWM_FREQ 10000  // pwm 频率 10khz
-#define MOTOR_PWM_RES  8      // pwm 分辨率 8-bit, 占空比 0-255
+// 10khz 可避开可闻噪声,8-bit 对应占空比 0-255
+#define MOTOR_PWM_FREQ 10000
+#define MOTOR_PWM_RES  8
 
 static const char* TAG = "motor";
 
-// 记录当前左右轮速度状态（由互斥锁保护多任务访问）
-static int              s_left = 0, s_right = 0;
+// s_left/s_right 会被 ui 任务和 http 任务并发访问,需要互斥
+static int               s_left = 0, s_right = 0;
 static SemaphoreHandle_t s_speed_mutex = NULL;
+
+// 最近一次 motor_drive 的 tick,用于看门狗判断失联,由 s_speed_mutex 一起保护
+static TickType_t s_last_cmd_tick = 0;
 
 typedef struct {
     gpio_num_t     in1;
@@ -25,19 +29,6 @@ typedef struct {
     ledc_channel_t ch;
 } wheel_cfg_t;
 
-/**
- * 电机配置说明:
- *
- * 使用两片 tb6612 驱动芯片，左板控制 fl+rl，右板控制 fr+rr。
- * 每片 tb6612 有独立的 stby 引脚用于待机控制。
- *
- * 电机方向:
- * - in1=1, in2=0: 正转 (前进)
- * - in1=0, in2=1: 反转 (后退)
- * - in1=0, in2=0: 停止 (滑行)
- *
- * 由于左右电机镜像安装，逻辑控制在 motor_drive 中统一处理。
- */
 static const wheel_cfg_t WHEELS[WHEEL_COUNT] = {
     [WHEEL_FL] = {MOTOR_FL_IN1, MOTOR_FL_IN2, MOTOR_FL_PWM, LEDC_CHANNEL_0},
     [WHEEL_FR] = {MOTOR_FR_IN1, MOTOR_FR_IN2, MOTOR_FR_PWM, LEDC_CHANNEL_1},
@@ -46,8 +37,10 @@ static const wheel_cfg_t WHEELS[WHEEL_COUNT] = {
 };
 
 static inline int clamp(int v, int lo, int hi) {
-    if (v < lo) return lo;
-    if (v > hi) return hi;
+    if (v < lo)
+        return lo;
+    if (v > hi)
+        return hi;
     return v;
 }
 
@@ -57,7 +50,7 @@ static void set_pwm(ledc_channel_t ch, uint32_t duty) {
 }
 
 void motor_init(void) {
-    // 配置 stby 引脚并拉高 (退出待机模式)
+    // stby 拉高使 tb6612 退出待机
     uint64_t      stby_mask = (1ULL << MOTOR_STBY_L) | (1ULL << MOTOR_STBY_R);
     gpio_config_t stby_cfg  = {
          .pin_bit_mask = stby_mask,
@@ -70,7 +63,6 @@ void motor_init(void) {
     s_speed_mutex = xSemaphoreCreateMutex();
     configASSERT(s_speed_mutex);
 
-    // 配置 pwm 定时器
     ledc_timer_config_t timer_cfg = {
         .speed_mode      = LEDC_LOW_SPEED_MODE,
         .duty_resolution = LEDC_TIMER_8_BIT,
@@ -80,7 +72,6 @@ void motor_init(void) {
     };
     ledc_timer_config(&timer_cfg);
 
-    // 初始化所有轮子的方向引脚和 pwm 通道
     for (int i = 0; i < WHEEL_COUNT; i++) {
         const wheel_cfg_t* w = &WHEELS[i];
 
@@ -104,11 +95,12 @@ void motor_init(void) {
         ledc_channel_config(&ch_cfg);
     }
 
-    ESP_LOGI(TAG, "motor init ok, freq=%d, res=%d", MOTOR_PWM_FREQ, MOTOR_PWM_RES);
+    ESP_LOGI(TAG, "motor ready, pwm=%dhz/%dbit", MOTOR_PWM_FREQ, MOTOR_PWM_RES);
 }
 
 void motor_set_wheel(wheel_t wheel, int speed) {
-    if (wheel >= WHEEL_COUNT) return;
+    if (wheel >= WHEEL_COUNT)
+        return;
 
     const wheel_cfg_t* w = &WHEELS[wheel];
     speed                = clamp(speed, -255, 255);
@@ -128,24 +120,17 @@ void motor_set_wheel(wheel_t wheel, int speed) {
     set_pwm(w->ch, (uint32_t)speed);
 }
 
-/**
- * 差速驱动逻辑
- *
- * left/right 范围: [-255, 255]
- * 正值前进，负值后退。
- * 由于左侧电机反向安装，在此处进行物理补偿。
- */
+// 左侧电机与右侧镜像安装,必须取反才能保证前进方向一致
 void motor_drive(int left, int right) {
+    // tick 必须和 speed 在同一把锁里更新,否则 watchdog 可能看到新 speed + 旧 tick 而误触发停车
     xSemaphoreTake(s_speed_mutex, portMAX_DELAY);
-    s_left  = left;
-    s_right = right;
+    s_left          = left;
+    s_right         = right;
+    s_last_cmd_tick = xTaskGetTickCount();
     xSemaphoreGive(s_speed_mutex);
 
-    // 左侧轮子速度取反以实现前进方向一致
     motor_set_wheel(WHEEL_FL, -left);
     motor_set_wheel(WHEEL_RL, -left);
-
-    // 右侧轮子保持原始极性
     motor_set_wheel(WHEEL_FR, right);
     motor_set_wheel(WHEEL_RR, right);
 }
@@ -156,7 +141,29 @@ void motor_stop(void) {
 
 void motor_get_speed(int* left, int* right) {
     xSemaphoreTake(s_speed_mutex, portMAX_DELAY);
-    if (left) *left = s_left;
-    if (right) *right = s_right;
+    if (left)
+        *left = s_left;
+    if (right)
+        *right = s_right;
     xSemaphoreGive(s_speed_mutex);
+}
+
+bool motor_watchdog_check(uint32_t timeout_ms) {
+    xSemaphoreTake(s_speed_mutex, portMAX_DELAY);
+    int        l         = s_left;
+    int        r         = s_right;
+    TickType_t last_tick = s_last_cmd_tick;
+    xSemaphoreGive(s_speed_mutex);
+
+    if (l == 0 && r == 0)
+        return false;
+
+    // 无符号减法天然处理 tick 回绕
+    uint32_t delta = (xTaskGetTickCount() - last_tick) * portTICK_PERIOD_MS;
+    if (delta >= timeout_ms) {
+        ESP_LOGW(TAG, "cmd timeout %u ms, stop", (unsigned)delta);
+        motor_stop();
+        return true;
+    }
+    return false;
 }

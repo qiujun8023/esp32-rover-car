@@ -5,14 +5,13 @@
 
 #include "config.h"
 
-// rmt 驱动配置
-#define LED_RMT_FREQ_HZ (10 * 1000 * 1000)  // 10mhz 分辨率
+// ws2812 位时序需要 10mhz rmt 分辨率才能满足 T0H/T1H 约束
+#define LED_RMT_FREQ_HZ (10 * 1000 * 1000)
 
 static const char*        TAG = "led";
 static led_strip_handle_t s_strip;
 
 void led_init(void) {
-    // 灯带硬件配置
     led_strip_config_t strip_cfg = {
         .strip_gpio_num   = LED_GPIO,
         .max_leds         = LED_COUNT,
@@ -20,17 +19,14 @@ void led_init(void) {
         .led_model        = LED_MODEL_WS2812,
     };
 
-    // rmt 传输配置
     led_strip_rmt_config_t rmt_cfg = {
         .resolution_hz = LED_RMT_FREQ_HZ,
     };
 
     ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_cfg, &rmt_cfg, &s_strip));
-
-    // 初始状态熄灭所有灯
     led_strip_clear(s_strip);
 
-    ESP_LOGI(TAG, "led init ok, pixels=%d", LED_COUNT);
+    ESP_LOGI(TAG, "led ready, pixels=%d", LED_COUNT);
 }
 
 void led_set(uint8_t index, led_color_t color) {
@@ -46,11 +42,11 @@ void led_set_all(led_color_t color) {
 }
 
 void led_flush(void) {
-    // 将缓冲区颜色推送到灯带
     led_strip_refresh(s_strip);
 }
 
 void led_off(void) {
-    // 熄灭所有灯并刷新
+    // clear 只清缓冲,需要 refresh 才真正熄灭硬件
     led_strip_clear(s_strip);
+    led_strip_refresh(s_strip);
 }
