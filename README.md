@@ -33,7 +33,6 @@
 ## 编译烧录
 
 ```bash
-idf.py set-target esp32s3
 idf.py build
 idf.py flash monitor
 ```
